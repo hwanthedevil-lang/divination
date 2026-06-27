@@ -120,7 +120,7 @@ header p {
 }
 .yao-line.broken::before { left:0; }
 .yao-line.broken::after { right:0; }
-.yao-line.changing {
+.yao-line.changing:not(.broken) {
   background:var(--red); box-shadow:0 0 8px rgba(192,57,43,0.4);
 }
 .yao-line.changing.broken::before,
@@ -1357,6 +1357,12 @@ function changingLine(lineVal) {
   return lineVal ? 0 : 1;
 }
 
+function getYaoLabel(position, isYang) {
+  // position: 1-6 (1=初, 6=上); isYang: true=阳爻(九), false=阴爻(六)
+  const NAMES = ['初', '二', '三', '四', '五', '上'];
+  return NAMES[position - 1] + (isYang ? '九' : '六');
+}
+
 function linesToTrigram(lines) {
   // lines: array of 3 values [bottom, middle, top]
   const key = lines.join(',');
@@ -1447,13 +1453,15 @@ function renderHexInfo(hexId, moveIdx) {
   html += `<dt>彖传</dt><dd>${h.tuan}</dd>`;
   html += `<dt>大象传</dt><dd>${h.xiang}</dd>`;
   html += `<dt>爻辞</dt>`;
-  const YAO_NAMES = ['初','二','三','四','五','上'];
+  const lines = hexLines(hexId); // [0]=初爻, ..., [5]=上爻
   for (let i = 5; i >= 0; i--) {
     const y = h.yao[i];
     const isChange = (i + 1 === moveIdx);
+    const isYang = lines[i] === 1;
+    const label = getYaoLabel(i + 1, isYang);
     const cls = isChange ? 'line-item changing' : 'line-item';
     const labelCls = isChange ? 'line-label changing-label' : 'line-label';
-    html += `<dd class="${cls}"><span class="${labelCls}">${YAO_NAMES[i]}爻</span>${y.t} <span style="color:var(--text3);font-size:12px;">${y.x}</span></dd>`;
+    html += `<dd class="${cls}"><span class="${labelCls}">${label}</span>${y.t} <span style="color:var(--text3);font-size:12px;">${y.x}</span></dd>`;
   }
   html += `</dl>`;
   return html;
@@ -1531,16 +1539,18 @@ function renderNumberPanel() {
   if (state.numN3) {
     const rem3 = state.numN3 % 6;
     const mv = rem3 === 0 ? 6 : rem3;
-    const YAO_NAMES = ['初','二','三','四','五','上'];
+    const moveYaoLabel = state.numHex
+      ? getYaoLabel(mv, hexLines(state.numHex)[mv - 1] === 1)
+      : (['初','二','三','四','五','上'][mv-1] + '爻');
     html += `<div class="card fade-in" style="margin-top:16px">`;
     html += `<div class="card-label">第三步 · 动爻</div>`;
-    html += `<div style="text-align:center;font-size:14px;color:var(--text2);margin-bottom:12px;">${state.numN3} ÷ 6 = ${Math.floor(state.numN3/6)} ··· <b>${rem3}</b>（余数${mv}→<span style="color:var(--red);font-weight:700;">${YAO_NAMES[mv-1]}爻</span>动）</div>`;
+    html += `<div style="text-align:center;font-size:14px;color:var(--text2);margin-bottom:12px;">${state.numN3} ÷ 6 = ${Math.floor(state.numN3/6)} ··· <b>${rem3}</b>（余数${mv}→<span style="color:var(--red);font-weight:700;">${moveYaoLabel}</span>动）</div>`;
     if (state.numHex && state.numMove) {
       // Show the changing line info separately
       const h = HEX[state.numHex];
       const yaoData = h.yao[state.numMove - 1];
       html += `<div class="line-item changing" style="font-size:16px;padding:14px;">`;
-      html += `<span class="line-label changing-label">${YAO_NAMES[state.numMove-1]}爻动</span>`;
+      html += `<span class="line-label changing-label">${moveYaoLabel}动</span>`;
       html += `<div style="margin-top:6px;font-weight:600;">${yaoData.t}</div>`;
       html += `<div style="color:var(--text2);font-size:13px;margin-top:4px;">${yaoData.x}</div>`;
       html += `</div>`;
@@ -1901,9 +1911,11 @@ function saveRecord(label) {
   // Generate summary
   let summary = '';
   if (state.mode === 'number' && state.numHex) {
-    summary = HEX[state.numHex].name + (state.numMove ? ' ' + ['','初','二','三','四','五','上'][state.numMove]+'爻动' : '');
+    const nLines = hexLines(state.numHex);
+    summary = HEX[state.numHex].name + (state.numMove ? ' ' + getYaoLabel(state.numMove, nLines[state.numMove - 1] === 1) + '动' : '');
   } else if (state.mode === 'meihua' && state.mhHex) {
-    summary = HEX[state.mhHex].name + (state.mhMove ? ' ' + ['','初','二','三','四','五','上'][state.mhMove]+'爻动' : '');
+    const nLines = hexLines(state.mhHex);
+    summary = HEX[state.mhHex].name + (state.mhMove ? ' ' + getYaoLabel(state.mhMove, nLines[state.mhMove - 1] === 1) + '动' : '');
   } else if (state.mode === 'xlr' && state.xlrResult !== null) {
     summary = XLR_GONG[state.xlrResult].name + '（' + XLR_GONG[state.xlrResult].ji + '）';
   }
